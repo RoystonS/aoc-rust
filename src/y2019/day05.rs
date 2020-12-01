@@ -5,6 +5,7 @@ use std::vec::Vec;
 #[aoc_generator(day5)]
 pub fn parser(input: &str) -> Vec<InstructionByte> {
     input
+        .trim()
         .split(",")
         .map(|line| line.parse::<InstructionByte>().unwrap())
         .collect::<Vec<InstructionByte>>()

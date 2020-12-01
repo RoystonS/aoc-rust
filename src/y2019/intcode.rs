@@ -6,6 +6,7 @@ pub struct IntCodeInterpreter {
     pub memory: InstructionBytes,
     ip: usize,
     inputs: MemoryData,
+    relative_base: usize,
 }
 
 #[derive(Debug)]
@@ -18,12 +19,14 @@ pub enum Action {
 pub enum Parameter {
     Position(usize),
     Immediate(isize),
+    Relative(isize),
 }
 impl Parameter {
     pub fn new(mode: isize, value: InstructionByte) -> Parameter {
         match mode {
             0 => Parameter::Position(value as usize),
             1 => Parameter::Immediate(value),
+            2 => Parameter::Relative(value),
             _ => unimplemented!(),
         }
     }
@@ -39,6 +42,7 @@ pub enum Instruction {
     JumpIfFalse(Parameter, Parameter),
     LessThan(Parameter, Parameter, Parameter),
     Equals(Parameter, Parameter, Parameter),
+    AdjustRelativeBase(Parameter),
     Halt,
 }
 
@@ -48,6 +52,7 @@ impl IntCodeInterpreter {
             ip: 0,
             memory: instructions.clone(),
             inputs: Vec::new(),
+            relative_base: 0,
         }
     }
 
@@ -95,24 +100,52 @@ impl IntCodeInterpreter {
                 Parameter::new(mode2, self.read()),
                 Parameter::new(mode3, self.read()),
             ),
+            9 => Instruction::AdjustRelativeBase(Parameter::new(mode1, self.read())),
             99 => Instruction::Halt,
             _ => unimplemented!("Unexpected opcode"),
         }
     }
 
     fn get_parameter(&mut self, parameter: Parameter) -> isize {
+        let final_pos;
+
         match parameter {
-            Parameter::Position(pos) => self.memory[pos],
-            Parameter::Immediate(val) => val,
+            Parameter::Immediate(val) => { return val; },
+            Parameter::Position(pos) =>  { final_pos = pos; },
+            Parameter::Relative(pos) => {
+                final_pos = (self.relative_base as isize + pos) as usize;
+            }
         }
+
+        self.grow_memory_to(final_pos);
+        self.memory[final_pos]
     }
 
     fn write(&mut self, to: Parameter, value: isize) {
+        let final_pos;
+
         match to {
             Parameter::Position(pos) => {
-                self.memory[pos] = value;
+                final_pos = pos;
             }
             Parameter::Immediate(_) => unimplemented!("Cannot write to immediate"),
+            Parameter::Relative(pos) => {
+                final_pos = (self.relative_base as isize + pos) as usize;
+            }
+        }
+        self.grow_memory_to(final_pos);
+
+        self.memory[final_pos] = value;
+    }
+
+    fn grow_memory_to(&mut self, size: usize) {
+        loop {
+            let len = self.memory.len();
+            if len <= size {
+                self.memory.push(0);
+            } else {
+                break;
+            }
         }
     }
 
@@ -176,6 +209,11 @@ impl IntCodeInterpreter {
                 let value1 = self.get_parameter(op1);
                 let value2 = self.get_parameter(op2);
                 self.write(target, if value1 == value2 { 1 } else { 0 });
+            }
+            Instruction::AdjustRelativeBase(delta) => {
+                let value = self.get_parameter(delta);
+                let final_base = self.relative_base as isize + value;
+                self.relative_base = final_base as usize;
             }
 
             Instruction::Halt => {

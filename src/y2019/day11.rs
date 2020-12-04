@@ -80,6 +80,16 @@ pub fn day11_part1(instructions: &Vec<InstructionByte>) -> usize {
     paint.len()
 }
 
+fn find_min_max<'a, I>(vals: I) -> (isize, isize)
+where
+    I: Iterator<Item = &'a isize>,
+    I: Clone,
+{
+    let min = *vals.clone().min().unwrap();
+    let max = *vals.max().unwrap();
+    (min, max)
+}
+
 #[aoc(day11, part2)]
 pub fn day11_part2(instructions: &Vec<InstructionByte>) -> String {
     let mut paint = HashMap::<Pos, isize>::new();
@@ -89,10 +99,8 @@ pub fn day11_part2(instructions: &Vec<InstructionByte>) -> String {
     let positions = paint.iter().map(|(pos, _)| pos);
     let columns = positions.clone().map(|Pos { row: _, col }| col);
     let rows = positions.map(|Pos { row, col: _ }| row);
-    let mincol = *columns.clone().min().unwrap();
-    let maxcol = *columns.max().unwrap();
-    let minrow = *rows.clone().min().unwrap();
-    let maxrow = *rows.max().unwrap();
+    let (mincol, maxcol) = find_min_max(columns);
+    let (minrow, maxrow) = find_min_max(rows);
 
     let mut lines = Vec::<String>::new();
     lines.push(String::new());
